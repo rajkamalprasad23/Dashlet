@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashlet — Short Video Streaming QoE Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">
+                <span class="logo-icon">▶</span>
+                <h1>Dashlet</h1>
+            </div>
+            <span class="subtitle">Taming Swipe Uncertainty for Robust Short Video Streaming</span>
+        </div>
+        <div class="header-right">
+            <span class="paper-ref">Li, Xie, Netravali, Jamieson — SIGCOMM 2022</span>
+        </div>
+    </header>
+
+    <!-- Main Layout -->
+    <div class="main-grid">
+        <!-- LEFT: Video Player -->
+        <div class="panel player-panel">
+            <div class="panel-header">
+                <span class="panel-title">📺 Video Player</span>
+                <span class="badge" id="algo-badge">Dashlet</span>
+            </div>
+
+            <div class="video-container">
+                <div class="video-surface" id="video-surface">
+                    <video id="real-video" class="real-video" muted playsinline loop preload="auto"></video>
+                    <div class="video-info">
+                        <span class="video-title" id="video-title">Video #1</span>
+                        <span class="bitrate-badge" id="bitrate-badge">— kbps</span>
+                    </div>
+                    <div class="buffering-overlay" id="buffering-overlay">
+                        <div class="spinner"></div>
+                        <span>Rebuffering...</span>
+                    </div>
+                    <div class="video-gradient"></div>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                    <div class="progress-chunks" id="progress-chunks"></div>
+                </div>
+                <div class="player-stats">
+                    <span id="playback-time">0.0s / 15.0s</span>
+                    <span id="video-index">Video 1 / 10</span>
+                </div>
+            </div>
+
+            <button class="swipe-btn" id="swipe-btn" onclick="handleSwipe()">
+                ⬆ SWIPE NEXT
+            </button>
+
+            <!-- Download Timeline -->
+            <div class="panel-header" style="margin-top: 16px;">
+                <span class="panel-title">📥 Download Timeline</span>
+            </div>
+            <div class="timeline-container" id="timeline-container">
+                <div class="timeline-empty">Start simulation to see download order</div>
+            </div>
+        </div>
+
+        <!-- RIGHT: Charts -->
+        <div class="charts-area">
+            <!-- Buffer Status -->
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <span class="panel-title">📊 Buffer Status</span>
+                    <span class="panel-hint">Chunks buffered per video</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="buffer-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- QoE Metrics -->
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <span class="panel-title">📈 QoE Metrics Over Time</span>
+                    <span class="panel-hint">QoE = R_bitrate − 4.3·P_rebuffer − 1.0·P_smooth</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="qoe-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Network Throughput -->
+            <div class="panel chart-panel">
+                <div class="panel-header">
+                    <span class="panel-title">🌐 Network Throughput</span>
+                    <span class="panel-hint" id="throughput-hint">Current: — Mbps</span>
+                </div>
+                <div class="chart-wrapper">
+                    <canvas id="throughput-chart"></canvas>
+                </div>
+            </div>
+
+            <!-- Comparison Panel -->
+            <div class="panel comparison-panel">
+                <div class="panel-header">
+                    <span class="panel-title">⚖️ Algorithm Comparison</span>
+                </div>
+                <div class="comparison-grid">
+                    <div class="comp-card dashlet-card">
+                        <h3>Dashlet</h3>
+                        <div class="comp-stat">
+                            <span class="stat-label">Total QoE</span>
+                            <span class="stat-value" id="dashlet-qoe">0.00</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Avg Bitrate</span>
+                            <span class="stat-value" id="dashlet-bitrate">— kbps</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Rebuffering</span>
+                            <span class="stat-value" id="dashlet-rebuf">0.0s</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Bytes Wasted</span>
+                            <span class="stat-value" id="dashlet-waste">0 KB</span>
+                        </div>
+                    </div>
+                    <div class="comp-card tiktok-card">
+                        <h3>TikTok Baseline</h3>
+                        <div class="comp-stat">
+                            <span class="stat-label">Total QoE</span>
+                            <span class="stat-value" id="tiktok-qoe">0.00</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Avg Bitrate</span>
+                            <span class="stat-value" id="tiktok-bitrate">— kbps</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Rebuffering</span>
+                            <span class="stat-value" id="tiktok-rebuf">0.0s</span>
+                        </div>
+                        <div class="comp-stat">
+                            <span class="stat-label">Bytes Wasted</span>
+                            <span class="stat-value" id="tiktok-waste">0 KB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Control Bar -->
+    <div class="control-bar">
+        <div class="control-group">
+            <label>Algorithm</label>
+            <select id="algo-select">
+                <option value="dashlet">Dashlet</option>
+                <option value="tiktok">TikTok Baseline</option>
+                <option value="both">Both (Compare)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Network</label>
+            <select id="network-select">
+                <option value="good_lte">Good LTE (8 Mbps)</option>
+                <option value="poor_lte">Poor LTE (2 Mbps)</option>
+                <option value="variable">Variable (1-6 Mbps)</option>
+                <option value="wifi_mall">WiFi Mall (Bursty)</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Speed: <span id="speed-label">1×</span></label>
+            <input type="range" id="speed-slider" min="1" max="10" value="1" step="1">
+        </div>
+        <div class="control-group btn-group">
+            <button class="ctrl-btn start-btn" id="start-btn" onclick="startSimulation()">▶ Start</button>
+            <button class="ctrl-btn reset-btn" id="reset-btn" onclick="resetSimulation()">↺ Reset</button>
+        </div>
+        <div class="control-group">
+            <label>Sim Time</label>
+            <span class="sim-clock" id="sim-clock">0.0s</span>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
